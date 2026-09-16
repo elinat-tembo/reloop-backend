@@ -23,9 +23,35 @@ Drive Next/Prev buttons off hasNext/hasPrev; request page+1 / page-1 with the
 same limit. totalPages lets you render page numbers if you want them later.
 
 
+LOCATIONS (city/region validation, applies to POST/PUT /api/listings)
+------------------------------------------------------------------
+city and region are validated as a pair against a curated list (not just
+individually) — a mismatched pair is rejected even if both values are
+independently real cities/regions. If neither city nor region is sent, no
+location validation runs (both stay null). If either is sent, both must be
+present and form a valid pair.
+
+const LOCATIONS = {
+  "Lusaka Province": ["Lusaka", "Kafue", "Chongwe", "Chilanga"],
+  "Copperbelt Province": ["Ndola", "Kitwe", "Chingola", "Mufulira", "Luanshya"],
+  "Southern Province": ["Livingstone", "Choma", "Mazabuka", "Monze"],
+  "Other Provinces": ["Kabwe", "Chipata", "Kasama", "Solwezi"]
+}
+
+400 Bad Request (region missing/unknown)
+{ "error": "region must be one of: Lusaka Province, Copperbelt Province, Southern Province, Other Provinces" }
+
+400 Bad Request (city doesn't belong to region, e.g. city="Ndola" with region="Lusaka Province")
+{ "error": "city must belong to the selected region" }
+
+
 =====================================
 LISTINGS — /api/listings
 =====================================
+NOTE: the city/region example values below ("Nairobi", "Nairobi County",
+etc.) predate the LOCATIONS constant above and are kept as-is since they
+were captured from a live run before this constant existed. New listings
+must use city/region pairs from LOCATIONS.
 
 POST /api/listings
 -------------------
@@ -50,6 +76,9 @@ POST /api/listings
 
 400 Bad Request (invalid/missing type)
 { "error": "type must be one of: Jackets, Shirts, Pants, Dresses, Shoes, Accessories, Outerwear, Other" }
+
+400 Bad Request (city/region pair invalid — see LOCATIONS section above)
+{ "error": "city must belong to the selected region" }
 
 
 GET /api/listings
@@ -207,6 +236,10 @@ Example body: { "availability": "unavailable", "estimatedValue": 40 }
 
 400 Bad Request (invalid type)
 { "error": "type must be one of: Jackets, Shirts, Pants, Dresses, Shoes, Accessories, Outerwear, Other" }
+
+400 Bad Request (city/region pair invalid — checked against the effective values,
+i.e. whichever of city/region wasn't sent falls back to the listing's current value)
+{ "error": "city must belong to the selected region" }
 
 404 Not Found
 { "error": "Listing not found" }

@@ -3,8 +3,19 @@ const { eq, and, or, sql } = require('drizzle-orm');
 const { db } = require('../db');
 const { clothingItems, swapRequests } = require('../db/schema');
 const { CATEGORIES } = require('../constants/categories');
+const { LOCATIONS, REGIONS } = require('../constants/locations');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const logger = require('../config/logger');
+
+function validateCityRegion(city, region) {
+  if (!region || !LOCATIONS[region]) {
+    return `region must be one of: ${REGIONS.join(', ')}`;
+  }
+  if (!city || !LOCATIONS[region].includes(city)) {
+    return 'city must belong to the selected region';
+  }
+  return null;
+}
 
 async function createListing(req, res) {
   try {
@@ -16,6 +27,13 @@ async function createListing(req, res) {
 
     if (!CATEGORIES.includes(type)) {
       return res.status(400).json({ error: `type must be one of: ${CATEGORIES.join(', ')}` });
+    }
+
+    if (city || region) {
+      const locationError = validateCityRegion(city, region);
+      if (locationError) {
+        return res.status(400).json({ error: locationError });
+      }
     }
 
     const [listing] = await db
@@ -129,6 +147,15 @@ async function updateListing(req, res) {
 
     if (type !== undefined && !CATEGORIES.includes(type)) {
       return res.status(400).json({ error: `type must be one of: ${CATEGORIES.join(', ')}` });
+    }
+
+    if (city !== undefined || region !== undefined) {
+      const effectiveCity = city !== undefined ? city : listing.city;
+      const effectiveRegion = region !== undefined ? region : listing.region;
+      const locationError = validateCityRegion(effectiveCity, effectiveRegion);
+      if (locationError) {
+        return res.status(400).json({ error: locationError });
+      }
     }
 
     const updates = { updatedAt: new Date() };
