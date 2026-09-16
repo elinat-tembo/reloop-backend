@@ -467,3 +467,88 @@ Distinct from reject so the requester can tell they backed out vs got declined.
 
 409 Conflict (not pending anymore)
 { "error": "This swap request is no longer pending (status: cancelled)" }
+
+
+=====================================
+CHAT — /api/swaps/:swapId/messages
+=====================================
+NOTE: these examples are constructed from the controller logic, not captured
+from a live run (the Chat module was built without live verification, per
+instruction). Shapes/status codes should match exactly, but timestamps/ids
+below are illustrative.
+
+Messages are immutable — send-only, no edit/delete endpoints. Only the
+fromUserId or toUserId of the swap request can send or view its messages.
+
+POST /api/swaps/:swapId/messages
+-----------------------------------
+Body: { "content": "Hey, is this jacket still in good shape?" }
+
+201 Created
+{
+  "message": {
+    "id": 1,
+    "swapRequestId": 1,
+    "senderId": 5,
+    "content": "Hey, is this jacket still in good shape?",
+    "createdAt": "2026-09-16T09:10:00.000Z"
+  }
+}
+
+400 Bad Request (empty/missing content)
+{ "error": "content is required" }
+
+403 Forbidden (not a participant on this swap request)
+{ "error": "You do not have permission to send messages on this swap request" }
+
+404 Not Found
+{ "error": "Swap request not found" }
+
+
+GET /api/swaps/:swapId/messages
+-----------------------------------
+Ordered oldest to newest. Optional ?after=<messageId> returns only messages
+with id greater than that value — poll with the highest id you've already
+seen to fetch just what's new.
+
+200 OK  (GET /api/swaps/1/messages)
+{
+  "messages": [
+    {
+      "id": 1,
+      "swapRequestId": 1,
+      "senderId": 5,
+      "content": "Hey, is this jacket still in good shape?",
+      "createdAt": "2026-09-16T09:10:00.000Z"
+    },
+    {
+      "id": 2,
+      "swapRequestId": 1,
+      "senderId": 6,
+      "content": "Yep, barely worn.",
+      "createdAt": "2026-09-16T09:11:30.000Z"
+    }
+  ]
+}
+
+200 OK  (GET /api/swaps/1/messages?after=1 — polling case, only the new message)
+{
+  "messages": [
+    {
+      "id": 2,
+      "swapRequestId": 1,
+      "senderId": 6,
+      "content": "Yep, barely worn.",
+      "createdAt": "2026-09-16T09:11:30.000Z"
+    }
+  ]
+}
+
+400 Bad Request (invalid after value)
+{ "error": "after must be a valid message id" }
+
+403 Forbidden (not a participant on this swap request)
+{ "error": "You do not have permission to view messages on this swap request" }
+
+404 Not Found
+{ "error": "Swap request not found" }
