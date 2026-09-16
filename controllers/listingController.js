@@ -1,8 +1,9 @@
-const { eq, and, or } = require('drizzle-orm');
+const { eq, and, or, sql } = require('drizzle-orm');
 
 const { db } = require('../db');
 const { clothingItems, swapRequests } = require('../db/schema');
 const { CATEGORIES } = require('../constants/categories');
+const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const logger = require('../config/logger');
 
 async function createListing(req, res) {
@@ -42,17 +43,28 @@ async function createListing(req, res) {
 async function getListings(req, res) {
   try {
     const { city, region, type, condition } = req.query;
+    const { page, limit, offset } = parsePagination(req.query);
 
     const conditions = [];
     if (city) conditions.push(eq(clothingItems.city, city));
     if (region) conditions.push(eq(clothingItems.region, region));
     if (type) conditions.push(eq(clothingItems.type, type));
     if (condition) conditions.push(eq(clothingItems.condition, condition));
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const query = db.select().from(clothingItems);
-    const listings = conditions.length > 0 ? await query.where(and(...conditions)) : await query;
+    let dataQuery = db.select().from(clothingItems);
+    let countQuery = db.select({ count: sql`count(*)` }).from(clothingItems);
+    if (whereClause) {
+      dataQuery = dataQuery.where(whereClause);
+      countQuery = countQuery.where(whereClause);
+    }
 
-    return res.json({ listings });
+    const [listings, [{ count }]] = await Promise.all([
+      dataQuery.limit(limit).offset(offset),
+      countQuery,
+    ]);
+
+    return res.json({ listings, pagination: buildPaginationMeta(page, limit, Number(count)) });
   } catch (err) {
     logger.error(`Fetching listings failed: ${err.message}`);
     return res.status(500).json({ error: 'Something went wrong while fetching listings' });
@@ -61,12 +73,22 @@ async function getListings(req, res) {
 
 async function getMyListings(req, res) {
   try {
-    const listings = await db
-      .select()
-      .from(clothingItems)
-      .where(eq(clothingItems.ownerId, req.user.id));
+    const { page, limit, offset } = parsePagination(req.query);
 
-    return res.json({ listings });
+    const [listings, [{ count }]] = await Promise.all([
+      db
+        .select()
+        .from(clothingItems)
+        .where(eq(clothingItems.ownerId, req.user.id))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql`count(*)` })
+        .from(clothingItems)
+        .where(eq(clothingItems.ownerId, req.user.id)),
+    ]);
+
+    return res.json({ listings, pagination: buildPaginationMeta(page, limit, Number(count)) });
   } catch (err) {
     logger.error(`Fetching own listings failed: ${err.message}`);
     return res.status(500).json({ error: 'Something went wrong while fetching your listings' });

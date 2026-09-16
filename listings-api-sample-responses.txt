@@ -1,0 +1,469 @@
+Reloop Backend API — Sample Responses
+======================================
+All examples below were captured from real requests against a running
+instance of this server (not hand-typed), so shapes/status codes are exact.
+
+PAGINATION (applies to GET /api/listings, GET /api/listings/mine,
+GET /api/swaps/incoming, GET /api/swaps/outgoing)
+------------------------------------------------------------------
+Offset-based, driven by query params (both optional):
+  ?page=<n>   default 1, invalid/non-positive values fall back to 1
+  ?limit=<n>  default 20, invalid/non-positive values fall back to 20, capped at 100
+
+Every paginated response adds a "pagination" object next to the data array:
+{
+  "page": 1,
+  "limit": 20,
+  "total": 7,
+  "totalPages": 1,
+  "hasNext": false,
+  "hasPrev": false
+}
+Drive Next/Prev buttons off hasNext/hasPrev; request page+1 / page-1 with the
+same limit. totalPages lets you render page numbers if you want them later.
+
+
+=====================================
+LISTINGS — /api/listings
+=====================================
+
+POST /api/listings
+-------------------
+201 Created
+{
+  "listing": {
+    "id": 2,
+    "ownerId": 5,
+    "type": "Jackets",
+    "brand": "Levi's",
+    "size": "M",
+    "condition": "Good",
+    "estimatedValue": "45",
+    "images": ["https://cdn.example.com/img1.jpg"],
+    "city": "Nairobi",
+    "region": "Nairobi County",
+    "availability": "available",
+    "createdAt": "2026-09-12T07:24:07.698Z",
+    "updatedAt": "2026-09-12T07:24:07.698Z"
+  }
+}
+
+400 Bad Request (invalid/missing type)
+{ "error": "type must be one of: Jackets, Shirts, Pants, Dresses, Shoes, Accessories, Outerwear, Other" }
+
+
+GET /api/listings
+------------------
+Supports optional combinable query params: ?city=&region=&type=&condition=
+Plus pagination: ?page=&limit= (see PAGINATION section above).
+Returns all listings regardless of availability. total/totalPages respect
+whatever city/region/type/condition filters were applied.
+
+200 OK  (GET /api/listings?page=1&limit=2)
+{
+  "listings": [
+    {
+      "id": 4,
+      "ownerId": 7,
+      "type": "Dresses",
+      "brand": "Zara",
+      "size": "S",
+      "condition": "New",
+      "estimatedValue": "30",
+      "images": null,
+      "city": "Kisumu",
+      "region": "Nyanza",
+      "availability": "available",
+      "createdAt": "2026-09-12T07:24:39.459Z",
+      "updatedAt": "2026-09-12T07:24:39.459Z"
+    },
+    {
+      "id": 3,
+      "ownerId": 6,
+      "type": "Shoes",
+      "brand": "Nike",
+      "size": "42",
+      "condition": "Fair",
+      "estimatedValue": "20",
+      "images": [],
+      "city": "Mombasa",
+      "region": "Coast",
+      "availability": "unavailable",
+      "createdAt": "2026-09-12T07:24:07.929Z",
+      "updatedAt": "2026-09-12T07:24:49.197Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 2,
+    "total": 7,
+    "totalPages": 4,
+    "hasNext": true,
+    "hasPrev": false
+  }
+}
+
+200 OK  (GET /api/listings?page=2&limit=2 — hasPrev flips true)
+{
+  "listings": [
+    { "id": 2, "ownerId": 5, "type": "Jackets", "...": "..." },
+    { "id": 5, "ownerId": 6, "type": "Pants", "...": "..." }
+  ],
+  "pagination": {
+    "page": 2,
+    "limit": 2,
+    "total": 7,
+    "totalPages": 4,
+    "hasNext": true,
+    "hasPrev": true
+  }
+}
+
+
+GET /api/listings/:id
+----------------------
+200 OK
+{
+  "listing": {
+    "id": 3,
+    "ownerId": 6,
+    "type": "Shoes",
+    "brand": "Nike",
+    "size": "42",
+    "condition": "Fair",
+    "estimatedValue": "20",
+    "images": [],
+    "city": "Mombasa",
+    "region": "Coast",
+    "availability": "unavailable",
+    "createdAt": "2026-09-12T07:24:07.929Z",
+    "updatedAt": "2026-09-12T07:24:49.197Z"
+  }
+}
+
+404 Not Found
+{ "error": "Listing not found" }
+
+
+GET /api/listings/mine
+-----------------------
+Supports pagination: ?page=&limit=
+
+200 OK  (GET /api/listings/mine?page=1&limit=1)
+{
+  "listings": [
+    {
+      "id": 3,
+      "ownerId": 6,
+      "type": "Shoes",
+      "brand": "Nike",
+      "size": "42",
+      "condition": "Fair",
+      "estimatedValue": "20",
+      "images": [],
+      "city": "Mombasa",
+      "region": "Coast",
+      "availability": "unavailable",
+      "createdAt": "2026-09-12T07:24:07.929Z",
+      "updatedAt": "2026-09-12T07:24:49.197Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 1,
+    "total": 3,
+    "totalPages": 3,
+    "hasNext": true,
+    "hasPrev": false
+  }
+}
+
+
+PUT /api/listings/:id
+-----------------------
+Example body: { "availability": "unavailable", "estimatedValue": 40 }
+
+200 OK
+{
+  "listing": {
+    "id": 2,
+    "ownerId": 5,
+    "type": "Jackets",
+    "brand": "Levi's",
+    "size": "M",
+    "condition": "Good",
+    "estimatedValue": "40",
+    "images": ["https://cdn.example.com/img1.jpg"],
+    "city": "Nairobi",
+    "region": "Nairobi County",
+    "availability": "unavailable",
+    "createdAt": "2026-09-12T07:24:07.698Z",
+    "updatedAt": "2026-09-12T07:26:00.000Z"
+  }
+}
+
+403 Forbidden
+{ "error": "You do not have permission to update this listing" }
+
+400 Bad Request (invalid type)
+{ "error": "type must be one of: Jackets, Shirts, Pants, Dresses, Shoes, Accessories, Outerwear, Other" }
+
+404 Not Found
+{ "error": "Listing not found" }
+
+
+DELETE /api/listings/:id
+--------------------------
+200 OK
+{ "message": "Listing deleted successfully" }
+
+403 Forbidden
+{ "error": "You do not have permission to delete this listing" }
+
+409 Conflict (pending swap request exists)
+{ "error": "Cancel the pending swap request before deleting this item." }
+
+404 Not Found
+{ "error": "Listing not found" }
+
+
+Note for frontend: estimatedValue is returned as a STRING (e.g. "45"), not a
+number — it's a Postgres numeric column and Drizzle serializes it as a string
+to avoid float precision loss. Parse it before doing math. It is NOT
+zero-padded to two decimals (a value of 45 comes back as "45", not "45.00").
+
+
+=====================================
+SWAP REQUESTS — /api/swaps
+=====================================
+status is one of: "pending", "accepted", "rejected", "expired", "cancelled"
+
+POST /api/swaps
+----------------
+Body: { "requestedItemId": 3, "offeredItemId": 2 }
+fromUserId = req.user.id, toUserId = owner of requestedItemId (set server-side).
+
+201 Created
+{
+  "swapRequest": {
+    "id": 1,
+    "fromUserId": 5,
+    "toUserId": 6,
+    "requestedItemId": 3,
+    "offeredItemId": 2,
+    "status": "pending",
+    "createdAt": "2026-09-12T07:24:19.082Z",
+    "updatedAt": "2026-09-12T07:24:19.082Z"
+  }
+}
+
+400 Bad Request (missing fields)
+{ "error": "requestedItemId and offeredItemId are required" }
+
+400 Bad Request (requesting your own item)
+{ "error": "You cannot request your own item" }
+
+403 Forbidden (offered item isn't yours)
+{ "error": "You do not own the offered item" }
+
+404 Not Found (offered item doesn't exist)
+{ "error": "Offered item not found" }
+
+404 Not Found (requested item doesn't exist)
+{ "error": "Requested item not found" }
+
+409 Conflict (offered item not available)
+{ "error": "Offered item is not available" }
+
+409 Conflict (requested item not available)
+{ "error": "Requested item is not available" }
+
+
+GET /api/swaps/incoming
+-------------------------
+Swap requests where toUserId = req.user.id (requests on MY items).
+Supports pagination: ?page=&limit=
+
+200 OK  (GET /api/swaps/incoming?limit=1)
+{
+  "swapRequests": [
+    {
+      "id": 1,
+      "fromUserId": 5,
+      "toUserId": 6,
+      "requestedItemId": 3,
+      "offeredItemId": 2,
+      "status": "accepted",
+      "createdAt": "2026-09-12T07:24:19.082Z",
+      "updatedAt": "2026-09-12T07:24:49.197Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 1,
+    "total": 4,
+    "totalPages": 4,
+    "hasNext": true,
+    "hasPrev": false
+  }
+}
+
+
+GET /api/swaps/outgoing
+-------------------------
+Swap requests where fromUserId = req.user.id (requests I sent).
+Supports pagination: ?page=&limit=
+
+200 OK  (GET /api/swaps/outgoing?page=2&limit=1)
+{
+  "swapRequests": [
+    {
+      "id": 3,
+      "fromUserId": 7,
+      "toUserId": 6,
+      "requestedItemId": 5,
+      "offeredItemId": 4,
+      "status": "rejected",
+      "createdAt": "2026-09-12T07:25:04.546Z",
+      "updatedAt": "2026-09-12T07:25:05.045Z"
+    }
+  ],
+  "pagination": {
+    "page": 2,
+    "limit": 1,
+    "total": 3,
+    "totalPages": 3,
+    "hasNext": true,
+    "hasPrev": true
+  }
+}
+
+
+GET /api/swaps/:id
+--------------------
+Only accessible to fromUserId or toUserId of that request.
+
+200 OK
+{
+  "swapRequest": {
+    "id": 1,
+    "fromUserId": 5,
+    "toUserId": 6,
+    "requestedItemId": 3,
+    "offeredItemId": 2,
+    "status": "pending",
+    "createdAt": "2026-09-12T07:24:19.082Z",
+    "updatedAt": "2026-09-12T07:24:19.082Z"
+  }
+}
+
+403 Forbidden (neither sender nor recipient)
+{ "error": "You do not have permission to view this swap request" }
+
+404 Not Found
+{ "error": "Swap request not found" }
+
+
+PATCH /api/swaps/:id/accept
+-----------------------------
+Only toUserId can accept, only while status is "pending".
+Side effects (all applied atomically in one batch):
+  - this request -> status "accepted"
+  - requestedItem and offeredItem -> availability "unavailable"
+  - every OTHER still-pending request touching either item (as
+    requestedItemId OR offeredItemId, in either role) -> status "expired"
+
+200 OK
+{
+  "swapRequest": {
+    "id": 1,
+    "fromUserId": 5,
+    "toUserId": 6,
+    "requestedItemId": 3,
+    "offeredItemId": 2,
+    "status": "accepted",
+    "createdAt": "2026-09-12T07:24:19.082Z",
+    "updatedAt": "2026-09-12T07:24:49.197Z"
+  }
+}
+
+403 Forbidden (not the recipient)
+{ "error": "Only the recipient of this swap request can accept it" }
+
+404 Not Found
+{ "error": "Swap request not found" }
+
+409 Conflict (not pending anymore)
+{ "error": "This swap request is no longer pending (status: accepted)" }
+
+Example of a competing request auto-expired as a side effect of the accept above
+(same requestedItemId, different offeredItemId/sender):
+{
+  "swapRequest": {
+    "id": 2,
+    "fromUserId": 7,
+    "toUserId": 6,
+    "requestedItemId": 3,
+    "offeredItemId": 4,
+    "status": "expired",
+    "createdAt": "2026-09-12T07:24:40.488Z",
+    "updatedAt": "2026-09-12T07:24:49.197Z"
+  }
+}
+
+
+PATCH /api/swaps/:id/reject
+-----------------------------
+Only toUserId can reject, only while status is "pending".
+
+200 OK
+{
+  "swapRequest": {
+    "id": 3,
+    "fromUserId": 7,
+    "toUserId": 6,
+    "requestedItemId": 5,
+    "offeredItemId": 4,
+    "status": "rejected",
+    "createdAt": "2026-09-12T07:25:04.546Z",
+    "updatedAt": "2026-09-12T07:25:05.045Z"
+  }
+}
+
+403 Forbidden (not the recipient)
+{ "error": "Only the recipient of this swap request can reject it" }
+
+404 Not Found
+{ "error": "Swap request not found" }
+
+409 Conflict (not pending anymore)
+{ "error": "This swap request is no longer pending (status: rejected)" }
+
+
+PATCH /api/swaps/:id/cancel
+-----------------------------
+Only fromUserId can cancel, only while status is "pending".
+Distinct from reject so the requester can tell they backed out vs got declined.
+
+200 OK
+{
+  "swapRequest": {
+    "id": 4,
+    "fromUserId": 7,
+    "toUserId": 6,
+    "requestedItemId": 6,
+    "offeredItemId": 4,
+    "status": "cancelled",
+    "createdAt": "2026-09-12T07:25:16.118Z",
+    "updatedAt": "2026-09-12T07:25:16.949Z"
+  }
+}
+
+403 Forbidden (not the sender)
+{ "error": "Only the sender of this swap request can cancel it" }
+
+404 Not Found
+{ "error": "Swap request not found" }
+
+409 Conflict (not pending anymore)
+{ "error": "This swap request is no longer pending (status: cancelled)" }

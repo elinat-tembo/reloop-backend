@@ -10,6 +10,7 @@ const { db } = require('./db');
 const { users } = require('./db/schema');
 const authRoutes = require('./routes/auth');
 const listingRoutes = require('./routes/listings');
+const swapRoutes = require('./routes/swaps');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use(morgan('dev', { stream: { write: (message) => logger.info(message.trim()
 
 app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
+app.use('/api/swaps', swapRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {
