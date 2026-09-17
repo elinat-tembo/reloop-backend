@@ -5,6 +5,7 @@ const {
   text,
   numeric,
   integer,
+  boolean,
   timestamp,
 } = require('drizzle-orm/pg-core');
 
@@ -15,6 +16,7 @@ const users = pgTable('users', {
   password: varchar('password', { length: 255 }).notNull(),
   contactDetails: varchar('contact_details', { length: 255 }),
   role: varchar('role', { length: 50 }).notNull().default('user'),
+  isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -45,12 +47,12 @@ const swapRequests = pgTable('swap_requests', {
   toUserId: integer('to_user_id')
     .notNull()
     .references(() => users.id),
-  requestedItemId: integer('requested_item_id')
-    .notNull()
-    .references(() => clothingItems.id),
-  offeredItemId: integer('offered_item_id')
-    .notNull()
-    .references(() => clothingItems.id),
+  requestedItemId: integer('requested_item_id').references(() => clothingItems.id, {
+    onDelete: 'set null',
+  }),
+  offeredItemId: integer('offered_item_id').references(() => clothingItems.id, {
+    onDelete: 'set null',
+  }),
   status: varchar('status', { length: 50 }).notNull().default('pending'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -61,9 +63,8 @@ const messages = pgTable('messages', {
   swapRequestId: integer('swap_request_id')
     .notNull()
     .references(() => swapRequests.id),
-  senderId: integer('sender_id')
-    .notNull()
-    .references(() => users.id),
+  senderId: integer('sender_id').references(() => users.id),
+  isSystem: boolean('is_system').notNull().default(false),
   content: text('content').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });

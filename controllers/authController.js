@@ -55,6 +55,12 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    if (!user.isActive) {
+      return res
+        .status(403)
+        .json({ error: 'Your account has been deactivated. Contact support.' });
+    }
+
     const token = jwt.sign(
       { userId: user.id, role: user.role },
       process.env.JWT_SECRET,

@@ -585,3 +585,311 @@ seen to fetch just what's new.
 
 404 Not Found
 { "error": "Swap request not found" }
+
+
+=====================================
+AUTH — /api/auth (updated)
+=====================================
+NOTE: constructed from the controller logic, not live-captured.
+
+POST /api/auth/login
+-----------------------
+403 Forbidden (new — account deactivated by an admin, even with correct credentials)
+{ "error": "Your account has been deactivated. Contact support." }
+
+
+=====================================
+SYSTEM MESSAGES (in swap chat history)
+=====================================
+NOTE: constructed from the controller logic, not live-captured.
+
+System messages are inserted automatically alongside the swap-status actions
+below. They appear in GET /api/swaps/:swapId/messages (and the admin
+equivalent) mixed in with regular user messages, oldest to newest.
+senderId is null and isSystem is true — render these differently from a
+normal chat bubble (e.g. centered system-style text) rather than attributing
+them to a user.
+
+Example entries:
+{
+  "id": 5,
+  "swapRequestId": 1,
+  "senderId": null,
+  "isSystem": true,
+  "content": "Bob accepted this swap request.",
+  "createdAt": "2026-09-16T10:00:00.000Z"
+}
+{
+  "id": 6,
+  "swapRequestId": 2,
+  "senderId": null,
+  "isSystem": true,
+  "content": "This swap request expired because one of the items was used in another accepted swap.",
+  "createdAt": "2026-09-16T10:00:00.000Z"
+}
+{
+  "id": 7,
+  "swapRequestId": 3,
+  "senderId": null,
+  "isSystem": true,
+  "content": "Carol rejected this swap request.",
+  "createdAt": "2026-09-16T10:05:00.000Z"
+}
+{
+  "id": 8,
+  "swapRequestId": 4,
+  "senderId": null,
+  "isSystem": true,
+  "content": "Dave cancelled this swap request.",
+  "createdAt": "2026-09-16T10:10:00.000Z"
+}
+{
+  "id": 9,
+  "swapRequestId": 3,
+  "senderId": null,
+  "isSystem": true,
+  "content": "This swap was cancelled because a listed item was removed by an admin.",
+  "createdAt": "2026-09-16T10:15:00.000Z"
+}
+{
+  "id": 10,
+  "swapRequestId": 3,
+  "senderId": null,
+  "isSystem": true,
+  "content": "An admin updated this swap request's status to rejected.",
+  "createdAt": "2026-09-16T10:20:00.000Z"
+}
+
+A regular (non-system) message for contrast, from the earlier Chat section:
+{
+  "id": 11,
+  "swapRequestId": 1,
+  "senderId": 5,
+  "isSystem": false,
+  "content": "Hey, is this jacket still in good shape?",
+  "createdAt": "2026-09-16T09:10:00.000Z"
+}
+
+
+=====================================
+ADMIN PANEL — /api/admin
+=====================================
+NOTE: constructed from the controller logic, not live-captured. All routes
+require auth + admin role; a non-admin (or unauthenticated) request gets:
+
+403 Forbidden (not an admin)
+{ "error": "Admin access required" }
+
+
+GET /api/admin/users
+-----------------------
+Supports pagination: ?page=&limit= (see PAGINATION section above). Password
+is always excluded.
+
+200 OK
+{
+  "users": [
+    {
+      "id": 5,
+      "name": "Alice",
+      "email": "alice@example.com",
+      "role": "user",
+      "isActive": true,
+      "createdAt": "2026-09-12T07:24:00.000Z"
+    },
+    {
+      "id": 6,
+      "name": "Bob",
+      "email": "bob@example.com",
+      "role": "user",
+      "isActive": false,
+      "createdAt": "2026-09-12T07:24:07.929Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 2,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  }
+}
+
+
+PATCH /api/admin/users/:id/deactivate
+PATCH /api/admin/users/:id/activate
+----------------------------------------
+200 OK  (same shape for both; isActive reflects the action taken)
+{
+  "user": {
+    "id": 6,
+    "name": "Bob",
+    "email": "bob@example.com",
+    "role": "user",
+    "isActive": false,
+    "createdAt": "2026-09-12T07:24:07.929Z"
+  }
+}
+
+404 Not Found
+{ "error": "User not found" }
+
+
+GET /api/admin/listings
+--------------------------
+Same shape/filters/pagination as GET /api/listings (?city=&region=&type=&condition=&page=&limit=),
+just admin-scoped. Already returns every listing regardless of availability
+(same as the public endpoint).
+
+200 OK
+{
+  "listings": [
+    {
+      "id": 2,
+      "ownerId": 5,
+      "type": "Jackets",
+      "brand": "Levi's",
+      "size": "M",
+      "condition": "Good",
+      "estimatedValue": "45",
+      "images": ["https://cdn.example.com/img1.jpg"],
+      "city": "Lusaka",
+      "region": "Lusaka Province",
+      "availability": "unavailable",
+      "createdAt": "2026-09-12T07:24:07.698Z",
+      "updatedAt": "2026-09-12T07:24:49.197Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  }
+}
+
+
+DELETE /api/admin/listings/:id
+----------------------------------
+Force-deletes regardless of pending swap requests (bypasses the regular
+owner-delete 409 block). Any pending swap request touching this item (as
+requestedItem OR offeredItem) is set to "cancelled_by_admin", gets a system
+message, and the OTHER item in that swap is set back to "available".
+
+200 OK
+{
+  "message": "Listing deleted successfully",
+  "cancelledSwapRequests": 1
+}
+
+404 Not Found
+{ "error": "Listing not found" }
+
+
+GET /api/admin/swaps
+-----------------------
+All swap requests, all statuses. Supports pagination: ?page=&limit=
+
+200 OK
+{
+  "swapRequests": [
+    {
+      "id": 3,
+      "fromUserId": 7,
+      "toUserId": 6,
+      "requestedItemId": 5,
+      "offeredItemId": 4,
+      "status": "cancelled_by_admin",
+      "createdAt": "2026-09-12T07:25:04.546Z",
+      "updatedAt": "2026-09-16T10:15:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  }
+}
+
+
+GET /api/admin/swaps/:id/messages
+--------------------------------------
+Same shape as GET /api/swaps/:swapId/messages, but bypasses the fromUser/
+toUser restriction — any admin can view any swap's full history.
+
+200 OK
+{
+  "messages": [
+    {
+      "id": 9,
+      "swapRequestId": 3,
+      "senderId": null,
+      "isSystem": true,
+      "content": "This swap was cancelled because a listed item was removed by an admin.",
+      "createdAt": "2026-09-16T10:15:00.000Z"
+    }
+  ]
+}
+
+404 Not Found
+{ "error": "Swap request not found" }
+
+
+PATCH /api/admin/swaps/:id/force-status
+--------------------------------------------
+Body: { "status": "rejected" }
+status must be one of: pending, accepted, rejected, expired, cancelled, cancelled_by_admin
+
+200 OK
+{
+  "swapRequest": {
+    "id": 3,
+    "fromUserId": 7,
+    "toUserId": 6,
+    "requestedItemId": 5,
+    "offeredItemId": 4,
+    "status": "rejected",
+    "createdAt": "2026-09-12T07:25:04.546Z",
+    "updatedAt": "2026-09-16T10:20:00.000Z"
+  }
+}
+
+400 Bad Request (invalid status)
+{ "error": "status must be one of: pending, accepted, rejected, expired, cancelled, cancelled_by_admin" }
+
+404 Not Found
+{ "error": "Swap request not found" }
+
+
+GET /api/admin/analytics
+----------------------------
+200 OK
+{
+  "totalUsers": 12,
+  "totalListings": 34,
+  "listingsByAvailability": {
+    "available": 21,
+    "unavailable": 13
+  },
+  "swapsByStatus": {
+    "pending": 4,
+    "accepted": 9,
+    "rejected": 3,
+    "expired": 2,
+    "cancelled": 1,
+    "cancelled_by_admin": 1
+  },
+  "topActiveUsers": [
+    { "userId": 5, "name": "Alice", "listingsCount": 6, "swapsCount": 4 },
+    { "userId": 6, "name": "Bob", "listingsCount": 5, "swapsCount": 3 },
+    { "userId": 7, "name": "Carol", "listingsCount": 3, "swapsCount": 2 },
+    { "userId": 8, "name": "Dave", "listingsCount": 2, "swapsCount": 2 },
+    { "userId": 9, "name": "Eve", "listingsCount": 1, "swapsCount": 1 }
+  ]
+}

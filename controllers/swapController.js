@@ -1,9 +1,15 @@
 const { eq, and, or, ne, sql } = require('drizzle-orm');
 
 const { db } = require('../db');
-const { swapRequests, clothingItems } = require('../db/schema');
+const { swapRequests, clothingItems, users, messages } = require('../db/schema');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { systemMessageValues } = require('../utils/systemMessages');
 const logger = require('../config/logger');
+
+async function getUserName(userId) {
+  const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  return user?.name || 'A user';
+}
 
 async function createSwapRequest(req, res) {
   try {
@@ -152,7 +158,7 @@ async function acceptSwapRequest(req, res) {
     const { requestedItemId, offeredItemId } = swapRequest;
     const now = new Date();
 
-    const [updated] = await db.batch([
+    const [acceptedRows, , , expiredRows] = await db.batch([
       db
         .update(swapRequests)
         .set({ status: 'accepted', updatedAt: now })
@@ -180,10 +186,25 @@ async function acceptSwapRequest(req, res) {
               eq(swapRequests.offeredItemId, offeredItemId)
             )
           )
-        ),
+        )
+        .returning(),
     ]);
 
-    return res.json({ swapRequest: updated[0] });
+    const updatedSwap = acceptedRows[0];
+    const toUserName = await getUserName(updatedSwap.toUserId);
+
+    const systemMessagesToInsert = [
+      systemMessageValues(updatedSwap.id, `${toUserName} accepted this swap request.`),
+      ...expiredRows.map((expired) =>
+        systemMessageValues(
+          expired.id,
+          'This swap request expired because one of the items was used in another accepted swap.'
+        )
+      ),
+    ];
+    await db.insert(messages).values(systemMessagesToInsert);
+
+    return res.json({ swapRequest: updatedSwap });
   } catch (err) {
     logger.error(`Accept swap request failed: ${err.message}`);
     return res.status(500).json({ error: 'Something went wrong while accepting the swap request' });
@@ -212,6 +233,11 @@ async function rejectSwapRequest(req, res) {
       .set({ status: 'rejected', updatedAt: new Date() })
       .where(eq(swapRequests.id, id))
       .returning();
+
+    const toUserName = await getUserName(updated.toUserId);
+    await db.insert(messages).values(
+      systemMessageValues(updated.id, `${toUserName} rejected this swap request.`)
+    );
 
     return res.json({ swapRequest: updated });
   } catch (err) {
@@ -242,6 +268,11 @@ async function cancelSwapRequest(req, res) {
       .set({ status: 'cancelled', updatedAt: new Date() })
       .where(eq(swapRequests.id, id))
       .returning();
+
+    const fromUserName = await getUserName(updated.fromUserId);
+    await db.insert(messages).values(
+      systemMessageValues(updated.id, `${fromUserName} cancelled this swap request.`)
+    );
 
     return res.json({ swapRequest: updated });
   } catch (err) {
