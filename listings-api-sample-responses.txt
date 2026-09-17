@@ -893,3 +893,54 @@ GET /api/admin/analytics
     { "userId": 9, "name": "Eve", "listingsCount": 1, "swapsCount": 1 }
   ]
 }
+
+
+=====================================
+SELF-SERVICE PROFILE — /api/users/me
+=====================================
+NOTE: constructed from the controller logic, not live-captured (per
+instruction — build/compile-check only this time). Both routes act on
+req.user.id from the JWT, so a user can only ever touch their own record.
+
+PUT /api/users/me
+--------------------
+Body: { "name": "Alice Updated", "contactDetails": "+260 97 123 4567" }
+Updates name/contactDetails only — email and password are untouched here.
+
+200 OK
+{
+  "user": {
+    "id": 5,
+    "name": "Alice Updated",
+    "email": "alice@example.com",
+    "contactDetails": "+260 97 123 4567",
+    "role": "user",
+    "isActive": true,
+    "createdAt": "2026-09-12T07:24:00.000Z"
+  }
+}
+
+400 Bad Request (missing name)
+{ "error": "name is required" }
+
+404 Not Found (shouldn't normally happen for a valid token, but guarded)
+{ "error": "User not found" }
+
+
+PATCH /api/users/me/password
+--------------------------------
+Body: { "currentPassword": "oldpassword123", "newPassword": "newpassword456" }
+Verifies currentPassword against the stored bcrypt hash before allowing the
+change. Returns only a success message — no user object, no token.
+
+200 OK
+{ "message": "Password updated successfully" }
+
+400 Bad Request (missing fields)
+{ "error": "currentPassword and newPassword are required" }
+
+401 Unauthorized (currentPassword doesn't match)
+{ "error": "Current password is incorrect" }
+
+404 Not Found (shouldn't normally happen for a valid token, but guarded)
+{ "error": "User not found" }

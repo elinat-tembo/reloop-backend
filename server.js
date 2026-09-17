@@ -12,6 +12,7 @@ const authRoutes = require('./routes/auth');
 const listingRoutes = require('./routes/listings');
 const swapRoutes = require('./routes/swaps');
 const adminRoutes = require('./routes/admin');
+const userRoutes = require('./routes/users');
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/swaps', swapRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/users', userRoutes);
 
 app.get('/api/health', async (req, res) => {
   try {
